@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.1",
   "info": {
-    "title": "B7.BankConnect.Api, Version=2026.9.0.0, Culture=neutral, PublicKeyToken=null",
+    "title": "BankConnect API",
     "version": "1.0"
   },
   "paths": {
