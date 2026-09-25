@@ -40,10 +40,20 @@ Accept: application/xml</code></pre>
     </tbody>
   </table>
 
-  <div class="callout">
-    <b>Note:</b>
-    <span>Full field-level schema for <code>pain.001.001.09</code> is standard ISO 20022 and not repeated here; see the <a href="../explorer/index.html">API Explorer</a> for how this operation is described in the API's own spec.</span>
-  </div>
+  <h2>XML schemas (XSD)</h2>
+  <p>Build the <code>pain.001</code> message, its <code>bcon</code> business message envelope and the XML signature according to the Georgian ISO 20022 schemas published at <a href="https://altasoft.github.io/geo-iso20022/" target="_blank" rel="noopener">altasoft.github.io/geo-iso20022</a>. The site lets you browse each XSD and check a sample document against it with its <a href="https://altasoft.github.io/geo-iso20022/validator.html" target="_blank" rel="noopener">XML Validator</a>.</p>
+  <table>
+    <thead><tr><th>Message</th><th>Namespace</th><th>Used for</th></tr></thead>
+    <tbody>
+      <tr><td><code>bcon.001.001.01</code></td><td><code>urn:ge:bankconnect:xsd:bcon.001.001.01</code></td><td>Signed <code>BusinessMessage</code> envelope for the request you send</td></tr>
+      <tr><td><code>head.001.001.02</code></td><td><code>urn:iso:std:iso:20022:tech:xsd:head.001.001.02</code></td><td><code>&lt;AppHdr&gt;</code> Business Application Header</td></tr>
+      <tr><td><code>pain.001.001.09</code></td><td><code>urn:iso:std:iso:20022:tech:xsd:pain.001.001.09</code></td><td><code>&lt;Document&gt;</code> Customer Credit Transfer Initiation</td></tr>
+      <tr><td><code>bcon.002.001.01</code></td><td><code>urn:ge:bankconnect:xsd:bcon.002.001.01</code></td><td>Signed <code>BusinessMessage</code> envelope for the response the bank returns</td></tr>
+      <tr><td><code>pain.002.001.10</code></td><td><code>urn:iso:std:iso:20022:tech:xsd:pain.002.001.10</code></td><td>Customer Payment Status Report in the response</td></tr>
+    </tbody>
+  </table>
+  <p>The XSD files for all of these messages can be downloaded from <a href="https://github.com/altasoft/geo-iso20022/tree/main/xsds" target="_blank" rel="noopener">github.com/altasoft/geo-iso20022/tree/main/xsds</a>, one folder per message.</p>
+  <p>See the <a href="../explorer/index.html">API Explorer</a> for complete request and response examples.</p>
 
   <div class="callout gap">
     <b>Gap:</b>

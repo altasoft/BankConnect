@@ -26,6 +26,7 @@ Accept: application/xml</code></pre>
       <tr><td><code>500 Internal Server Error</code></td><td>Unexpected failure; body is a small <code>&lt;Error&gt;</code> XML document.</td></tr>
     </tbody>
   </table>
+  <p>The XML body is a signed <code>BusinessMessage</code> envelope (<code>bcon.002.001.01</code>) that carries a <code>head.001.001.02</code> Business Application Header and the message document, e.g. a <code>pain.002.001.10</code> payment status report. The XSDs are published at <a href="https://altasoft.github.io/geo-iso20022/" target="_blank" rel="noopener">altasoft.github.io/geo-iso20022</a> and can be downloaded from <a href="https://github.com/altasoft/geo-iso20022/tree/main/xsds" target="_blank" rel="noopener">github.com/altasoft/geo-iso20022/tree/main/xsds</a>; use them to parse and validate the message.</p>
   <p>Pass the <code>Row-Version</code> header you received back on your next poll so the API knows your current cursor position.</p>
 
   <h2>2. Confirm the message</h2>
