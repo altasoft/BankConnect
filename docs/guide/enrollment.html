@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Enrollment &middot; BankConnect Developer Guide</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body data-active="Enrollment">
+<nav class="topnav" id="topnav"></nav>
+
+<div class="page content">
+  <h1>Enrollment</h1>
+  <p class="lede">Enrollment is how you turn a bank-issued, one-time enrollment file into the two certificates you'll use for every subsequent API call.</p>
+
+  <ol class="steps">
+    <li>
+      <h3>The bank issues you an enrollment file</h3>
+      <p>The bank generates a password-protected enrollment file out-of-band and shares it (and the password, separately) with you. It contains an encrypted, time-limited <b>enrollment token</b> scoped to your <code>enrollmentId</code>, <code>clientApplicationId</code>, environment, and the exact CSR-upload URL you must call.</p>
+    </li>
+    <li>
+      <h3>You generate two certificate signing requests (CSRs)</h3>
+      <p>Generate two separate key pairs and CSRs locally &mdash; your private keys never leave your systems:</p>
+      <ul>
+        <li><b>mTLS client CSR</b> &mdash; RSA (3072&ndash;8192 bits, exponent 65537) or ECDSA (P-256/P-384)</li>
+        <li><b>Document-signing CSR</b> &mdash; RSA only (3072&ndash;8192 bits, exponent 65537); ECDSA is not accepted for the signing certificate</li>
+      </ul>
+    </li>
+    <li>
+      <h3>Upload the CSRs</h3>
+      <p>Call the CSR upload endpoint with the enrollment token from step 1 as a bearer token, and your <code>enrollmentId</code> as a query parameter:</p>
+      <pre><code>POST /csr?enrollmentId={enrollmentId}
+Authorization: Bearer {enrollmentToken}
+Content-Type: application/json
+
+{
+  "clientApplicationId": "{clientApplicationId}",
+  "mtlsClientCsrPem": "-----BEGIN CERTIFICATE REQUEST-----...",
+  "signingCsrPem": "-----BEGIN CERTIFICATE REQUEST-----...",
+  "environment": "Production"
+}</code></pre>
+      <p>The <code>environment</code> value must match the environment embedded in your enrollment token.</p>
+    </li>
+    <li>
+      <h3>Receive your certificates</h3>
+      <p>On success, the API returns both issued certificates as PEM:</p>
+      <pre><code>{
+  "mtlsCertificatePem": "-----BEGIN CERTIFICATE-----...",
+  "signingCertificatePem": "-----BEGIN CERTIFICATE-----..."
+}</code></pre>
+      <p>Combine each returned certificate with the private key you generated in step 2 (matching the CSR you sent) to get a usable certificate + key pair. Certificates are valid for one year from issuance.</p>
+    </li>
+  </ol>
+
+  <h2>Error responses to handle</h2>
+  <table>
+    <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>401 Unauthorized</code></td><td>Missing, malformed, or invalid/expired enrollment token.</td></tr>
+      <tr><td><code>400 Bad Request</code></td><td>Missing <code>enrollmentId</code>, <code>clientApplicationId</code>, or a CSR field.</td></tr>
+      <tr><td><code>422 Unprocessable Entity</code></td><td>A CSR failed validation (bad key size, unsupported algorithm, malformed PEM).</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <b>Note:</b>
+    <span>See it live, including the exact JSON schema, in the <a href="../explorer/index.html#POST-/csr">API Explorer</a>.</span>
+  </div>
+
+  <div class="callout gap">
+    <b>Gap:</b>
+    <span>The out-of-band delivery mechanism for the enrollment file/password (email, portal, etc.) and who to contact to kick off enrollment aren't part of the API surface &mdash; get that process from your bank contact.</span>
+  </div>
+</div>
+
+<footer class="site-footer">BankConnect API &middot; Client Integration Guide</footer>
+<script src="../assets/nav.js"></script>
+</body>
+</html>

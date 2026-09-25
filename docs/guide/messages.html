@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Getting Messages &middot; BankConnect Developer Guide</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body data-active="Getting Messages">
+<nav class="topnav" id="topnav"></nav>
+
+<div class="page content">
+  <h1>Getting Messages</h1>
+  <p class="lede">Outgoing messages (e.g. notifications generated for your client application) are retrieved by polling a "next message" endpoint and explicitly confirming each one you've processed.</p>
+
+  <h2>1. Poll for the next message</h2>
+  <pre><code>GET /messages/next
+Row-Version: {lastKnownRowVersion}   (optional)
+Accept: application/xml</code></pre>
+  <p>Authenticated via your mTLS client certificate. Behavior:</p>
+  <table>
+    <thead><tr><th>Response</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>200 OK</code> + XML body</td><td>The next available message for your client application, plus a <code>Row-Version</code> response header identifying it.</td></tr>
+      <tr><td><code>204 No Content</code></td><td>No new message is waiting.</td></tr>
+      <tr><td><code>500 Internal Server Error</code></td><td>Unexpected failure; body is a small <code>&lt;Error&gt;</code> XML document.</td></tr>
+    </tbody>
+  </table>
+  <p>Pass the <code>Row-Version</code> header you received back on your next poll so the API knows your current cursor position.</p>
+
+  <h2>2. Confirm the message</h2>
+  <p>Once you've durably processed a message, confirm it so it's removed from the queue and the next poll advances:</p>
+  <pre><code>POST /messages/confirm/{messageId}</code></pre>
+  <p>Where <code>{messageId}</code> is the <code>Row-Version</code> value returned with that message. On success, the response body is <code>&lt;Result&gt;Ok&lt;/Result&gt;</code>.</p>
+
+  <h2>Suggested polling pattern</h2>
+  <ol class="steps">
+    <li><h3>Poll</h3><p>Call <code>GET /messages/next</code> with your last stored <code>Row-Version</code>.</p></li>
+    <li><h3>Process</h3><p>If you get a <code>200</code>, parse and durably handle the message content before doing anything else.</p></li>
+    <li><h3>Confirm</h3><p>Only after processing succeeds, call <code>POST /messages/confirm/{messageId}</code> with that message's row version, then repeat from step 1. If confirmation fails, retry it before polling again &mdash; don't re-poll past an unconfirmed message.</p></li>
+  </ol>
+
+  <div class="callout gap">
+    <b>Gap:</b>
+    <span>Recommended polling interval, message retention window, and whether a push/webhook alternative exists (a callback URL field exists on client application records, but no endpoint in the reviewed API surface documents its use) aren't defined here &mdash; confirm with the bank integration team.</span>
+  </div>
+</div>
+
+<footer class="site-footer">BankConnect API &middot; Client Integration Guide</footer>
+<script src="../assets/nav.js"></script>
+</body>
+</html>

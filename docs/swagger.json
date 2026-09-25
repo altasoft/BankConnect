@@ -1,0 +1,464 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "B7.BankConnect.Api, Version=2026.9.0.0, Culture=neutral, PublicKeyToken=null",
+    "version": "1.0"
+  },
+  "paths": {
+    "/csr": {
+      "post": {
+        "tags": [
+          "Enrollment"
+        ],
+        "summary": "Issues the client's mTLS and document-signing certificates from two certificate signing requests (CSRs).\r\nThis is the only BankConnect call that does not require an mTLS client certificate; it is authorized\r\nby the enrollment token from the bank-issued enrollment file instead.",
+        "description": "Enrollment process:\r\n            \r\n1. The bank generates a password-protected enrollment file and shares it (and the password, separately)\r\n   with the client. The file contains the `enrollmentId`, `clientApplicationId`, environment, CSR upload URL\r\n   and a time-limited enrollment token bound to that `enrollmentId`.\r\n2. The client generates two key pairs and CSRs locally. The private keys never leave the client's systems.\r\n   - mTLS client CSR: RSA (3072–8192 bits, exponent 65537) or ECDSA (P-256/P-384).\r\n   - Document-signing CSR: RSA only (3072–8192 bits, exponent 65537).\r\n3. The client calls this endpoint with the enrollment token as `Authorization: Bearer {token}`,\r\n   the `enrollmentId` as a query parameter and both PEM-encoded CSRs in the body.\r\n   `environment` must match the environment of the API being called (e.g. `Production`, `Testing`).\r\n4. The API returns both issued certificates as PEM. The client combines each certificate with the\r\n   matching private key: the mTLS certificate is presented on every TLS connection, and the signing\r\n   certificate is used to sign ISO 20022 business messages (e.g. pain.001).",
+        "parameters": [
+          {
+            "name": "enrollmentId",
+            "in": "query",
+            "description": "The enrollment identifier from the enrollment file. Must match the subject of the enrollment token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Client application ID, environment and the PEM-encoded mTLS and document-signing CSRs.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "description": "Defines the request used to upload the QWAC and QSEAL certificate signing requests.",
+                "$ref": "#/components/schemas/CsrUploadRequest"
+              },
+              "examples": {
+                "csr-upload": {
+                  "summary": "CSR upload request",
+                  "value": {
+                    "clientApplicationId": "1001",
+                    "mtlsClientCsrPem": "-----BEGIN CERTIFICATE REQUEST-----\nMIIEnjCCAwYCAQAwWTELMAkGA1UEBhMCR0UxHTAbBgNVBAoMFEV4YW1wbGUgT3Jn\n...\n-----END CERTIFICATE REQUEST-----",
+                    "signingCsrPem": "-----BEGIN CERTIFICATE REQUEST-----\nMIIEnzCCAwcCAQAwWjELMAkGA1UEBhMCR0UxHTAbBgNVBAoMFEV4YW1wbGUgT3Jn\n...\n-----END CERTIFICATE REQUEST-----",
+                    "environment": "Production"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Certificates issued. Combine each certificate with the private key of the matching CSR.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Defines the response returned after uploading the MTLS and QSEAL certificate signing requests.",
+                  "$ref": "#/components/schemas/CsrUploadResponse"
+                },
+                "examples": {
+                  "issued": {
+                    "summary": "Issued certificates",
+                    "value": {
+                      "mtlsCertificatePem": "-----BEGIN CERTIFICATE-----\nMIIFazCCA1OgAwIBAgIUX2k7c1b0...\n...\n-----END CERTIFICATE-----",
+                      "signingCertificatePem": "-----BEGIN CERTIFICATE-----\nMIIFbDCCA1SgAwIBAgIUY3m8d2c1...\n...\n-----END CERTIFICATE-----"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A required value is missing or has an invalid format. An absent field, query parameter or Authorization header is rejected with a validation problem; an empty value or an invalid clientApplicationId is reported only after the enrollment token has been accepted.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "empty-value": {
+                    "summary": "A required value is empty",
+                    "value": "Signing certificate signing request is missing."
+                  },
+                  "invalid-client-id": {
+                    "summary": "clientApplicationId is not a positive integer",
+                    "value": "Invalid Client ID."
+                  },
+                  "validation": {
+                    "summary": "A required field, query parameter or header is absent",
+                    "value": {
+                      "type": "/error-codes#BadArgument",
+                      "title": "One or more validation errors occurred.",
+                      "status": 400,
+                      "instance": "/csr",
+                      "errors": {
+                        "enrollmentId": [
+                          "The enrollmentId field is required."
+                        ]
+                      },
+                      "code": "BadArgument",
+                      "traceId": "00-afb96acac3a9bcc2b887f3e25a2c7ad5-51b2804826672a9e-00"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The enrollment token is malformed, expired, or was not issued for this enrollmentId. The token is checked before the request body is validated.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "missing": {
+                    "summary": "Authorization header is not a Bearer token",
+                    "value": "Enrollment token is missing."
+                  },
+                  "invalid": {
+                    "summary": "Invalid or expired token",
+                    "value": "Enrollment token is invalid."
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A CSR could not be processed (malformed PEM, unsupported algorithm or key size).",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "invalid-csr": {
+                    "summary": "Invalid CSR",
+                    "value": "Invalid certificate signing request. ASN1 corrupted data."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "EnrollmentBearer": [ ]
+          }
+        ]
+      }
+    },
+    "/messages/next": {
+      "get": {
+        "tags": [
+          "Messages"
+        ],
+        "summary": "Returns the next outgoing message for the calling client application, i.e. the oldest message\r\nwhose row version is greater than the supplied `Row-Version` cursor.",
+        "description": "The client application is identified by its mTLS client certificate.\r\n            \r\nMessages are pain.002.001.10 payment status reports for previously submitted pain.001 payments,\r\nwrapped in a signed `BusinessMessage` envelope (bcon.002.001.01) together with a Business Application Header.\r\nThe bank signs every message; verify the signature with the bank's signing certificate before trusting the content.\r\n            \r\nPolling process:\r\n            \r\n1. Call `GET /messages/next`, sending the last row version you processed in the `Row-Version` header.\r\n   Omit the header on the very first call to start from the beginning of the queue.\r\n2. On `200 OK`, durably process the message and store the `Row-Version` response header value.\r\n   The same value is also contained in `AppHdr/BizMsgIdr` as `{BIC}-{rowVersion}`.\r\n3. Confirm the message with `POST /messages/confirm/{rowVersion}` and poll again with the new cursor.\r\n4. On `204 No Content` there are no more messages; wait before polling again.\r\n            \r\nMessages are not removed by this call. Until they are confirmed, polling with an older cursor\r\n(or without the header) returns them again.",
+        "parameters": [
+          {
+            "name": "Row-Version",
+            "in": "header",
+            "description": "The row version of the last message already processed by the client. Omit to start from the beginning of the queue.",
+            "schema": {
+              "examples": [
+                "0000000000000001"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The next outgoing message. Store the Row-Version header and confirm the message after processing it.",
+            "headers": {
+              "Row-Version": {
+                "description": "Row version of the returned message. Send it as the Row-Version request header on the next poll and use it as {messageId} when confirming.",
+                "schema": {
+                  "examples": [
+                    "0000000000000001"
+                  ],
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "type": "object",
+                  "xml": {
+                    "name": "BusinessMessage",
+                    "namespace": "urn:ge:bankconnect:xsd:bcon.002.001.01"
+                  }
+                },
+                "examples": {
+                  "settled": {
+                    "summary": "pain.002.001.10: transaction settled (ACSC)",
+                    "value": "<BusinessMessage xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns=\"urn:ge:bankconnect:xsd:bcon.002.001.01\">\n  <AppHdr xmlns=\"urn:iso:std:iso:20022:tech:xsd:head.001.001.02\">\n    <Fr>\n      <FIId>\n        <FinInstnId>\n          <BICFI>ALTAGE22</BICFI>\n        </FinInstnId>\n      </FIId>\n    </Fr>\n    <To>\n      <OrgId>\n        <Id>\n          <OrgId>\n            <Othr>\n              <Id>999999999</Id>\n              <SchmeNm>\n                <Cd>COID</Cd>\n              </SchmeNm>\n            </Othr>\n          </OrgId>\n        </Id>\n      </OrgId>\n    </To>\n    <BizMsgIdr>ALTAGE22-0000000000000001</BizMsgIdr>\n    <MsgDefIdr>pain.002.001.10</MsgDefIdr>\n    <BizSvc>bc.payment.service.01</BizSvc>\n    <CreDt>2026-09-25T10:16:05+04:00</CreDt>\n    <Sgntr>\n      <Signature Id=\"ALTAGE22\" xmlns=\"http://www.w3.org/2000/09/xmldsig#\">\n        <SignedInfo>\n          <CanonicalizationMethod Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\" />\n          <SignatureMethod Algorithm=\"http://www.w3.org/2001/04/xmldsig-more#rsa-sha256\" />\n          <Reference URI=\"\">\n            <Transforms>\n              <Transform Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\" />\n              <Transform Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\" />\n            </Transforms>\n            <DigestMethod Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\" />\n            <DigestValue>EXAMPLE_DIGEST_VALUE</DigestValue>\n          </Reference>\n        </SignedInfo>\n        <SignatureValue>EXAMPLE_SIGNATURE_VALUE</SignatureValue>\n        <KeyInfo>\n          <X509Data>\n            <X509SubjectName>CN=Example Signing Certificate, O=Example Organization</X509SubjectName>\n            <X509Certificate>EXAMPLE_CERTIFICATE</X509Certificate>\n          </X509Data>\n        </KeyInfo>\n      </Signature>\n    </Sgntr>\n  </AppHdr>\n  <Document xmlns=\"urn:iso:std:iso:20022:tech:xsd:pain.002.001.10\">\n    <CstmrPmtStsRpt>\n      <GrpHdr>\n        <MsgId>0b8f4a5e2c7d4e1f9a3b6c8d0e2f4a6b</MsgId>\n        <CreDtTm>2026-09-25T10:16:04+04:00</CreDtTm>\n      </GrpHdr>\n      <OrgnlGrpInfAndSts>\n        <OrgnlMsgId>7f3b36c84d9a4f04b65c0c84f69c2d71</OrgnlMsgId>\n        <OrgnlMsgNmId>pain.001.001.09</OrgnlMsgNmId>\n      </OrgnlGrpInfAndSts>\n      <OrgnlPmtInfAndSts>\n        <OrgnlPmtInfId>4cce718a7c3f4fd58a928f01d70ad62d</OrgnlPmtInfId>\n        <TxInfAndSts>\n          <OrgnlInstrId>320f66ab63f84352a98b0bb3d237e5a7</OrgnlInstrId>\n          <OrgnlEndToEndId>6af32920a6f345c8a33c4f85700331c8</OrgnlEndToEndId>\n          <OrgnlUETR>53e84746-a4ea-4ec1-8f42-a53d47e79c2a</OrgnlUETR>\n          <TxSts>ACSC</TxSts>\n        </TxInfAndSts>\n      </OrgnlPmtInfAndSts>\n    </CstmrPmtStsRpt>\n  </Document>\n</BusinessMessage>"
+                  },
+                  "transaction-rejected": {
+                    "summary": "pain.002.001.10: transaction rejected (RJCT)",
+                    "value": "<BusinessMessage xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns=\"urn:ge:bankconnect:xsd:bcon.002.001.01\">\n  <AppHdr xmlns=\"urn:iso:std:iso:20022:tech:xsd:head.001.001.02\">\n    <Fr>\n      <FIId>\n        <FinInstnId>\n          <BICFI>ALTAGE22</BICFI>\n        </FinInstnId>\n      </FIId>\n    </Fr>\n    <To>\n      <OrgId>\n        <Id>\n          <OrgId>\n            <Othr>\n              <Id>999999999</Id>\n              <SchmeNm>\n                <Cd>COID</Cd>\n              </SchmeNm>\n            </Othr>\n          </OrgId>\n        </Id>\n      </OrgId>\n    </To>\n    <BizMsgIdr>ALTAGE22-0000000000000002</BizMsgIdr>\n    <MsgDefIdr>pain.002.001.10</MsgDefIdr>\n    <BizSvc>bc.payment.service.01</BizSvc>\n    <CreDt>2026-09-25T10:16:05+04:00</CreDt>\n    <Sgntr>\n      <Signature Id=\"ALTAGE22\" xmlns=\"http://www.w3.org/2000/09/xmldsig#\">\n        <SignedInfo>\n          <CanonicalizationMethod Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\" />\n          <SignatureMethod Algorithm=\"http://www.w3.org/2001/04/xmldsig-more#rsa-sha256\" />\n          <Reference URI=\"\">\n            <Transforms>\n              <Transform Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\" />\n              <Transform Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\" />\n            </Transforms>\n            <DigestMethod Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\" />\n            <DigestValue>EXAMPLE_DIGEST_VALUE</DigestValue>\n          </Reference>\n        </SignedInfo>\n        <SignatureValue>EXAMPLE_SIGNATURE_VALUE</SignatureValue>\n        <KeyInfo>\n          <X509Data>\n            <X509SubjectName>CN=Example Signing Certificate, O=Example Organization</X509SubjectName>\n            <X509Certificate>EXAMPLE_CERTIFICATE</X509Certificate>\n          </X509Data>\n        </KeyInfo>\n      </Signature>\n    </Sgntr>\n  </AppHdr>\n  <Document xmlns=\"urn:iso:std:iso:20022:tech:xsd:pain.002.001.10\">\n    <CstmrPmtStsRpt>\n      <GrpHdr>\n        <MsgId>5d1e9c3a7b2f4d6e8a0c2e4f6a8b0c2d</MsgId>\n        <CreDtTm>2026-09-25T10:16:04+04:00</CreDtTm>\n      </GrpHdr>\n      <OrgnlGrpInfAndSts>\n        <OrgnlMsgId>7f3b36c84d9a4f04b65c0c84f69c2d71</OrgnlMsgId>\n        <OrgnlMsgNmId>pain.001.001.09</OrgnlMsgNmId>\n      </OrgnlGrpInfAndSts>\n      <OrgnlPmtInfAndSts>\n        <OrgnlPmtInfId>4cce718a7c3f4fd58a928f01d70ad62d</OrgnlPmtInfId>\n        <TxInfAndSts>\n          <OrgnlInstrId>320f66ab63f84352a98b0bb3d237e5a7</OrgnlInstrId>\n          <OrgnlEndToEndId>6af32920a6f345c8a33c4f85700331c8</OrgnlEndToEndId>\n          <OrgnlUETR>53e84746-a4ea-4ec1-8f42-a53d47e79c2a</OrgnlUETR>\n          <TxSts>RJCT</TxSts>\n          <StsRsnInf>\n            <Rsn>\n              <Cd>MS03</Cd>\n            </Rsn>\n            <AddtlInf>Internal processing error</AddtlInf>\n          </StsRsnInf>\n        </TxInfAndSts>\n      </OrgnlPmtInfAndSts>\n    </CstmrPmtStsRpt>\n  </Document>\n</BusinessMessage>"
+                  },
+                  "group-rejected": {
+                    "summary": "pain.002.001.10: whole payment message rejected (group RJCT)",
+                    "value": "<BusinessMessage xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns=\"urn:ge:bankconnect:xsd:bcon.002.001.01\">\n  <AppHdr xmlns=\"urn:iso:std:iso:20022:tech:xsd:head.001.001.02\">\n    <Fr>\n      <FIId>\n        <FinInstnId>\n          <BICFI>ALTAGE22</BICFI>\n        </FinInstnId>\n      </FIId>\n    </Fr>\n    <To>\n      <OrgId>\n        <Id>\n          <OrgId>\n            <Othr>\n              <Id>999999999</Id>\n              <SchmeNm>\n                <Cd>COID</Cd>\n              </SchmeNm>\n            </Othr>\n          </OrgId>\n        </Id>\n      </OrgId>\n    </To>\n    <BizMsgIdr>ALTAGE22-0000000000000003</BizMsgIdr>\n    <MsgDefIdr>pain.002.001.10</MsgDefIdr>\n    <BizSvc>bc.payment.service.01</BizSvc>\n    <CreDt>2026-09-25T10:17:12+04:00</CreDt>\n    <Sgntr>\n      <Signature Id=\"ALTAGE22\" xmlns=\"http://www.w3.org/2000/09/xmldsig#\">\n        <SignedInfo>\n          <CanonicalizationMethod Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\" />\n          <SignatureMethod Algorithm=\"http://www.w3.org/2001/04/xmldsig-more#rsa-sha256\" />\n          <Reference URI=\"\">\n            <Transforms>\n              <Transform Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\" />\n              <Transform Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\" />\n            </Transforms>\n            <DigestMethod Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\" />\n            <DigestValue>EXAMPLE_DIGEST_VALUE</DigestValue>\n          </Reference>\n        </SignedInfo>\n        <SignatureValue>EXAMPLE_SIGNATURE_VALUE</SignatureValue>\n        <KeyInfo>\n          <X509Data>\n            <X509SubjectName>CN=Example Signing Certificate, O=Example Organization</X509SubjectName>\n            <X509Certificate>EXAMPLE_CERTIFICATE</X509Certificate>\n          </X509Data>\n        </KeyInfo>\n      </Signature>\n    </Sgntr>\n  </AppHdr>\n  <Document xmlns=\"urn:iso:std:iso:20022:tech:xsd:pain.002.001.10\">\n    <CstmrPmtStsRpt>\n      <GrpHdr>\n        <MsgId>0000000000000003</MsgId>\n        <CreDtTm>2026-09-25T10:17:11+04:00</CreDtTm>\n      </GrpHdr>\n      <OrgnlGrpInfAndSts>\n        <OrgnlMsgId>7f3b36c84d9a4f04b65c0c84f69c2d71</OrgnlMsgId>\n        <OrgnlMsgNmId>pain.001.001.09</OrgnlMsgNmId>\n        <GrpSts>RJCT</GrpSts>\n        <StsRsnInf>\n          <Rsn>\n            <Cd>MS03</Cd>\n          </Rsn>\n          <AddtlInf>Internal processing error</AddtlInf>\n        </StsRsnInf>\n      </OrgnlGrpInfAndSts>\n    </CstmrPmtStsRpt>\n  </Document>\n</BusinessMessage>"
+                  }
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No message newer than the supplied Row-Version is waiting. Poll again later.",
+            "headers": {
+              "Row-Version": {
+                "description": "The unchanged cursor (the supplied Row-Version, or 0000000000000000 if none was sent).",
+                "schema": {
+                  "examples": [
+                    "0000000000000001"
+                  ],
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred. Retry the request.",
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "type": "object",
+                  "xml": {
+                    "name": "Error"
+                  }
+                },
+                "examples": {
+                  "error": {
+                    "summary": "Unexpected error",
+                    "value": "<Error><Message>An unexpected error occurred.</Message></Error>"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "mTLS": [ ]
+          }
+        ]
+      }
+    },
+    "/messages/confirm/{messageId}": {
+      "post": {
+        "tags": [
+          "Messages"
+        ],
+        "summary": "Confirms delivery of outgoing messages and removes them from the client's queue.",
+        "description": "Confirmation is cumulative: every message of the calling client application with a row version\r\nless than or equal to `messageId` is deleted, not only the message with that exact row version.\r\nConfirm only after the message, and all earlier ones, have been durably processed.\r\n            \r\nConfirming is idempotent. Repeating it with the same or an older row version succeeds and deletes nothing more.",
+        "parameters": [
+          {
+            "name": "messageId",
+            "in": "path",
+            "description": "The `Row-Version` value returned with the last processed message.",
+            "required": true,
+            "schema": {
+              "examples": [
+                "0000000000000001"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All messages up to and including the given row version were removed from the queue.",
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "type": "object",
+                  "xml": {
+                    "name": "Result"
+                  }
+                },
+                "examples": {
+                  "ok": {
+                    "summary": "Messages confirmed",
+                    "value": "<Result>Ok</Result>"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred. Retry the request.",
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "type": "object",
+                  "xml": {
+                    "name": "Error"
+                  }
+                },
+                "examples": {
+                  "error": {
+                    "summary": "Unexpected error",
+                    "value": "<Error><Message>An unexpected error occurred.</Message></Error>"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "mTLS": [ ]
+          }
+        ]
+      }
+    },
+    "/pain.001/create/rtgs": {
+      "post": {
+        "tags": [
+          "Pain001"
+        ],
+        "summary": "Creates an RTGS credit transfer from an ISO 20022 pain.001.001.09 message.\r\nThe request must be provided as signed XML and contain both the Business Application Header\r\nand the payment initiation document. The message signature is validated before the transfer\r\nis submitted for processing.",
+        "requestBody": {
+          "description": "ISO 20022 BankConnect Business Message (bc.001.001.01). For more details and XSD please check out: https://altasoft.github.io/geo-iso20022/",
+          "content": {
+            "application/xml": {
+              "schema": {
+                "type": "object",
+                "xml": {
+                  "name": "BusinessMessage",
+                  "namespace": "urn:ge:bankconnect:xsd:bcon.001.001.01"
+                }
+              },
+              "examples": {
+                "pain.001.001.09": {
+                  "summary": "Example pain.001.001.09 message",
+                  "value": "\r\n<BusinessMessage xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns=\"urn:ge:bankconnect:xsd:bcon.001.001.01\">\r\n  <AppHdr xmlns=\"urn:iso:std:iso:20022:tech:xsd:head.001.001.02\">\r\n    <Fr>\r\n      <OrgId>\r\n        <Id>\r\n          <OrgId>\r\n            <Othr>\r\n              <Id>999999999</Id>\r\n              <SchmeNm>\r\n                <Cd>COID</Cd>\r\n              </SchmeNm>\r\n            </Othr>\r\n          </OrgId>\r\n        </Id>\r\n      </OrgId>\r\n    </Fr>\r\n    <To>\r\n      <FIId>\r\n        <FinInstnId>\r\n          <BICFI>ALTAGE22</BICFI>\r\n        </FinInstnId>\r\n      </FIId>\r\n    </To>\r\n    <BizMsgIdr>7f3b36c84d9a4f04b65c0c84f69c2d71</BizMsgIdr>\r\n    <MsgDefIdr>pain.001.001.09</MsgDefIdr>\r\n    <BizSvc>bc.payment.service.01</BizSvc>\r\n    <CreDt>2026-09-25T10:15:00+04:00</CreDt>\r\n    <Sgntr>\r\n      <Signature\r\n          Id=\"EXAMPLE\"\r\n          xmlns=\"http://www.w3.org/2000/09/xmldsig#\">\r\n        <SignedInfo>\r\n          <CanonicalizationMethod\r\n              Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\" />\r\n          <SignatureMethod\r\n              Algorithm=\"http://www.w3.org/2001/04/xmldsig-more#rsa-sha256\" />\r\n          <Reference URI=\"\">\r\n            <Transforms>\r\n              <Transform\r\n                  Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\" />\r\n              <Transform\r\n                  Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\" />\r\n            </Transforms>\r\n            <DigestMethod\r\n                Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\" />\r\n            <DigestValue>EXAMPLE_DIGEST_VALUE</DigestValue>\r\n          </Reference>\r\n        </SignedInfo>\r\n        <SignatureValue>EXAMPLE_SIGNATURE_VALUE</SignatureValue>\r\n        <KeyInfo>\r\n          <X509Data>\r\n            <X509SubjectName>\r\n              CN=Example Document Signing, O=Example Organization, OU=Development, C=GE\r\n            </X509SubjectName>\r\n            <X509Certificate>\r\n              EXAMPLE_CERTIFICATE\r\n            </X509Certificate>\r\n          </X509Data>\r\n        </KeyInfo>\r\n      </Signature>\r\n    </Sgntr>\r\n  </AppHdr>\r\n  <Document xmlns=\"urn:iso:std:iso:20022:tech:xsd:pain.001.001.09\">\r\n    <CstmrCdtTrfInitn>\r\n      <GrpHdr>\r\n        <MsgId>7f3b36c84d9a4f04b65c0c84f69c2d71</MsgId>\r\n        <CreDtTm>2026-09-25T10:15:00+04:00</CreDtTm>\r\n        <NbOfTxs>1</NbOfTxs>\r\n        <CtrlSum>100</CtrlSum>\r\n        <InitgPty>\r\n          <Id>\r\n            <OrgId>\r\n              <Othr>\r\n                <Id>999999999</Id>\r\n                <SchmeNm>\r\n                  <Cd>COID</Cd>\r\n                </SchmeNm>\r\n              </Othr>\r\n            </OrgId>\r\n          </Id>\r\n        </InitgPty>\r\n      </GrpHdr>\r\n      <PmtInf>\r\n        <PmtInfId>4cce718a7c3f4fd58a928f01d70ad62d</PmtInfId>\r\n        <PmtMtd>TRF</PmtMtd>\r\n        <ReqdExctnDt>\r\n          <Dt>2026-09-25</Dt>\r\n        </ReqdExctnDt>\r\n        <Dbtr>\r\n          <Nm>EXAMPLE DEBTOR</Nm>\r\n          <Id>\r\n            <OrgId>\r\n              <Othr>\r\n                <Id>999999999</Id>\r\n                <SchmeNm>\r\n                  <Cd>COID</Cd>\r\n                </SchmeNm>\r\n              </Othr>\r\n            </OrgId>\r\n          </Id>\r\n        </Dbtr>\r\n        <DbtrAcct>\r\n          <Id>\r\n            <IBAN>GE71ZZ0000000000000001</IBAN>\r\n          </Id>\r\n          <Ccy>GEL</Ccy>\r\n        </DbtrAcct>\r\n        <DbtrAgt>\r\n          <FinInstnId>\r\n            <BICFI>ALTAGE22</BICFI>\r\n          </FinInstnId>\r\n        </DbtrAgt>\r\n        <CdtTrfTxInf>\r\n          <PmtId>\r\n            <InstrId>320f66ab63f84352a98b0bb3d237e5a7</InstrId>\r\n            <EndToEndId>6af32920a6f345c8a33c4f85700331c8</EndToEndId>\r\n            <UETR>53e84746-a4ea-4ec1-8f42-a53d47e79c2a</UETR>\r\n          </PmtId>\r\n          <PmtTpInf>\r\n            <InstrPrty>HIGH</InstrPrty>\r\n          </PmtTpInf>\r\n          <Amt>\r\n            <InstdAmt Ccy=\"GEL\">100</InstdAmt>\r\n          </Amt>\r\n          <CdtrAgt>\r\n            <FinInstnId>\r\n              <BICFI>TESTGE22</BICFI>\r\n            </FinInstnId>\r\n          </CdtrAgt>\r\n          <Cdtr>\r\n            <Nm>EXAMPLE CREDITOR</Nm>\r\n          </Cdtr>\r\n          <CdtrAcct>\r\n            <Id>\r\n              <IBAN>GE44ZZ0000000000000002</IBAN>\r\n            </Id>\r\n            <Ccy>GEL</Ccy>\r\n          </CdtrAcct>\r\n          <RmtInf>\r\n            <Ustrd>Example payment</Ustrd>\r\n          </RmtInf>\r\n        </CdtTrfTxInf>\r\n      </PmtInf>\r\n    </CstmrCdtTrfInitn>\r\n  </Document>\r\n</BusinessMessage>"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Payment initiation accepted successfully.",
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "type": "object",
+                  "xml": {
+                    "name": "BusinessMessage",
+                    "namespace": "urn:ge:bankconnect:xsd:bcon.002.001.01"
+                  }
+                },
+                "examples": {
+                  "success": {
+                    "summary": "Successful pain.002.001.10 response",
+                    "value": "<BusinessMessage xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns=\"urn:ge:bankconnect:xsd:bcon.002.001.01\">\r\n  <AppHdr xmlns=\"urn:iso:std:iso:20022:tech:xsd:head.001.001.02\">\r\n    <Fr>\r\n      <FIId>\r\n        <FinInstnId>\r\n          <BICFI>TESTGE22</BICFI>\r\n        </FinInstnId>\r\n      </FIId>\r\n    </Fr>\r\n    <To>\r\n      <OrgId>\r\n        <Id>\r\n          <OrgId>\r\n            <Othr>\r\n              <Id>999999999</Id>\r\n              <SchmeNm>\r\n                <Cd>COID</Cd>\r\n              </SchmeNm>\r\n            </Othr>\r\n          </OrgId>\r\n        </Id>\r\n      </OrgId>\r\n    </To>\r\n    <BizMsgIdr>c7fd24fbc82d48a9871cb2683987fb27</BizMsgIdr>\r\n    <MsgDefIdr>pain.002.001.10</MsgDefIdr>\r\n    <BizSvc>bc.payment.service.01</BizSvc>\r\n    <CreDt>2026-09-25T10:36:47+04:00</CreDt>\r\n    <Sgntr>\r\n      <Signature Id=\"TESTGE22\" xmlns=\"http://www.w3.org/2000/09/xmldsig#\">\r\n        <SignedInfo>\r\n          <CanonicalizationMethod Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\" />\r\n          <SignatureMethod Algorithm=\"http://www.w3.org/2001/04/xmldsig-more#rsa-sha256\" />\r\n          <Reference URI=\"\">\r\n            <Transforms>\r\n              <Transform Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\" />\r\n              <Transform Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\" />\r\n            </Transforms>\r\n            <DigestMethod Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\" />\r\n            <DigestValue>EXAMPLE_DIGEST_VALUE</DigestValue>\r\n          </Reference>\r\n        </SignedInfo>\r\n        <SignatureValue>EXAMPLE_SIGNATURE_VALUE</SignatureValue>\r\n        <KeyInfo>\r\n          <X509Data>\r\n            <X509SubjectName>CN=Example Signing Certificate, O=Example Organization</X509SubjectName>\r\n            <X509Certificate>EXAMPLE_CERTIFICATE</X509Certificate>\r\n          </X509Data>\r\n        </KeyInfo>\r\n      </Signature>\r\n    </Sgntr>\r\n  </AppHdr>\r\n  <Document xmlns=\"urn:iso:std:iso:20022:tech:xsd:pain.002.001.10\">\r\n    <CstmrPmtStsRpt>\r\n      <GrpHdr>\r\n        <MsgId>c7fd24fbc82d48a9871cb2683987fb27</MsgId>\r\n        <CreDtTm>2026-09-25T10:36:47+04:00</CreDtTm>\r\n      </GrpHdr>\r\n      <OrgnlGrpInfAndSts>\r\n        <OrgnlMsgId>c297927d136f4a9482360d5181e7b19b</OrgnlMsgId>\r\n        <OrgnlMsgNmId>pain.001.001.09</OrgnlMsgNmId>\r\n        <GrpSts>RCVD</GrpSts>\r\n      </OrgnlGrpInfAndSts>\r\n    </CstmrPmtStsRpt>\r\n  </Document>\r\n</BusinessMessage>"
+                  },
+                  "rejected": {
+                    "summary": "Rejected pain.002.001.10 response",
+                    "value": "<BusinessMessage xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns=\"urn:ge:bankconnect:xsd:bcon.002.001.01\">\r\n  <AppHdr xmlns=\"urn:iso:std:iso:20022:tech:xsd:head.001.001.02\">\r\n    <Fr>\r\n      <FIId>\r\n        <FinInstnId>\r\n          <BICFI>TESTGE22</BICFI>\r\n        </FinInstnId>\r\n      </FIId>\r\n    </Fr>\r\n    <To>\r\n      <OrgId>\r\n        <Id>\r\n          <OrgId>\r\n            <Othr>\r\n              <Id>999999999</Id>\r\n              <SchmeNm>\r\n                <Cd>COID</Cd>\r\n              </SchmeNm>\r\n            </Othr>\r\n          </OrgId>\r\n        </Id>\r\n      </OrgId>\r\n    </To>\r\n    <BizMsgIdr>d2d5b45c9a5e49479e57e7c8b8bb665a</BizMsgIdr>\r\n    <MsgDefIdr>pain.002.001.10</MsgDefIdr>\r\n    <BizSvc>bc.payment.service.01</BizSvc>\r\n    <CreDt>2026-09-25T10:37:59+04:00</CreDt>\r\n    <Sgntr>\r\n      <Signature Id=\"TESTGE22\" xmlns=\"http://www.w3.org/2000/09/xmldsig#\">\r\n        <SignedInfo>\r\n          <CanonicalizationMethod Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\" />\r\n          <SignatureMethod Algorithm=\"http://www.w3.org/2001/04/xmldsig-more#rsa-sha256\" />\r\n          <Reference URI=\"\">\r\n            <Transforms>\r\n              <Transform Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\" />\r\n              <Transform Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\" />\r\n            </Transforms>\r\n            <DigestMethod Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\" />\r\n            <DigestValue>EXAMPLE_DIGEST_VALUE</DigestValue>\r\n          </Reference>\r\n        </SignedInfo>\r\n        <SignatureValue>EXAMPLE_SIGNATURE_VALUE</SignatureValue>\r\n        <KeyInfo>\r\n          <X509Data>\r\n            <X509SubjectName>CN=Example Signing Certificate, O=Example Organization</X509SubjectName>\r\n            <X509Certificate>EXAMPLE_CERTIFICATE</X509Certificate>\r\n          </X509Data>\r\n        </KeyInfo>\r\n      </Signature>\r\n    </Sgntr>\r\n  </AppHdr>\r\n  <Document xmlns=\"urn:iso:std:iso:20022:tech:xsd:pain.002.001.10\">\r\n    <CstmrPmtStsRpt>\r\n      <GrpHdr>\r\n        <MsgId>d2d5b45c9a5e49479e57e7c8b8bb665a</MsgId>\r\n        <CreDtTm>2026-09-25T10:37:59+04:00</CreDtTm>\r\n      </GrpHdr>\r\n      <OrgnlGrpInfAndSts>\r\n        <OrgnlMsgId>bb3330b321e14812a99d6285f8afe020</OrgnlMsgId>\r\n        <OrgnlMsgNmId>pain.001.001.09</OrgnlMsgNmId>\r\n        <GrpSts>RJCT</GrpSts>\r\n        <StsRsnInf>\r\n          <Rsn>\r\n            <Cd>DU01</Cd>\r\n          </Rsn>\r\n        </StsRsnInf>\r\n      </OrgnlGrpInfAndSts>\r\n    </CstmrPmtStsRpt>\r\n  </Document>\r\n</BusinessMessage>"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "mTLS": [ ]
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CsrUploadRequest": {
+        "required": [
+          "clientApplicationId",
+          "environment",
+          "mtlsClientCsrPem",
+          "signingCsrPem"
+        ],
+        "type": "object",
+        "properties": {
+          "clientApplicationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The ID of the client."
+          },
+          "mtlsClientCsrPem": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The PEM-encoded MTLS client certificate signing request."
+          },
+          "signingCsrPem": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The PEM-encoded Signing certificate signing request."
+          },
+          "environment": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The environment for the enrollment."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Defines the request used to upload the QWAC and QSEAL certificate signing requests."
+      },
+      "CsrUploadResponse": {
+        "required": [
+          "mtlsCertificatePem",
+          "signingCertificatePem"
+        ],
+        "type": "object",
+        "properties": {
+          "mtlsCertificatePem": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The PEM-encoded MTLS certificate, if issuing was successful."
+          },
+          "signingCertificatePem": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The PEM-encoded Signing certificate, if issuing was successful."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Defines the response returned after uploading the MTLS and QSEAL certificate signing requests."
+      }
+    },
+    "securitySchemes": {
+      "EnrollmentBearer": {
+        "type": "http",
+        "description": "Enrollment Bearer token. Example: Bearer {token}",
+        "scheme": "bearer",
+        "bearerFormat": "Enrollment token"
+      },
+      "mTLS": {
+        "type": "mutualTLS",
+        "description": "Mutual TLS client certificate is required."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Enrollment"
+    },
+    {
+      "name": "Messages"
+    },
+    {
+      "name": "Pain001"
+    }
+  ]
+}

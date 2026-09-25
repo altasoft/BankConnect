@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>BankConnect Developer Guide</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body data-active="Overview">
+<nav class="topnav" id="topnav"></nav>
+
+<div class="hero">
+  <h1>BankConnect Developer Guide</h1>
+  <p>Everything a client application needs to integrate with the BankConnect API: how to enroll and get certificates, how to authenticate, how to send payments, how to receive messages, and a full interactive reference generated from the live API spec.</p>
+</div>
+
+<div class="page">
+  <div class="card-grid">
+    <a class="card" href="guide/authentication.html">
+      <div class="card-icon">1</div>
+      <h3>Authentication</h3>
+      <p>mTLS client certificates, how the API identifies your application, and how requests are routed through a proxy or load balancer.</p>
+    </a>
+    <a class="card" href="guide/enrollment.html">
+      <div class="card-icon">2</div>
+      <h3>Enrollment</h3>
+      <p>How your bank-issued enrollment file becomes a working mTLS client certificate and document-signing certificate.</p>
+    </a>
+    <a class="card" href="guide/payments.html">
+      <div class="card-icon">3</div>
+      <h3>Sending Payments</h3>
+      <p>Submitting a signed pain.001 RTGS credit transfer and handling the pain.002 response.</p>
+    </a>
+    <a class="card" href="guide/messages.html">
+      <div class="card-icon">4</div>
+      <h3>Getting Messages</h3>
+      <p>Polling for outgoing messages and confirming receipt so the queue advances.</p>
+    </a>
+    <a class="card" href="explorer/index.html">
+      <div class="card-icon">&lt;/&gt;</div>
+      <h3>API Explorer</h3>
+      <p>Every endpoint, request and response schema, browsable straight from the API's own OpenAPI spec.</p>
+    </a>
+  </div>
+
+  <div class="callout" style="margin-top:40px">
+    <b>Source of truth:</b>
+    <span>This guide is generated and written directly from the BankConnect API source code and its OpenAPI spec. Anything not shown here should be confirmed with the bank integration team rather than assumed.</span>
+  </div>
+</div>
+
+<footer class="site-footer">BankConnect API &middot; Client Integration Guide</footer>
+
+<script src="assets/nav.js"></script>
+</body>
+</html>

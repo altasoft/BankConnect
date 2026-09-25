@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Sending Payments &middot; BankConnect Developer Guide</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body data-active="Sending Payments">
+<nav class="topnav" id="topnav"></nav>
+
+<div class="page content">
+  <h1>Sending Payments</h1>
+  <p class="lede">Submit an RTGS credit transfer as a signed ISO 20022 <code>pain.001</code> document; the API responds synchronously with a <code>pain.002</code> status document.</p>
+
+  <h2>Endpoint</h2>
+  <pre><code>POST /pain.001/create/rtgs
+Content-Type: application/xml
+Accept: application/xml</code></pre>
+  <p>Authenticated via your mTLS client certificate (see <a href="authentication.html">Authentication</a>) &mdash; no separate token is needed on this call.</p>
+
+  <h2>Request body</h2>
+  <p>The XML body must contain both of the following elements, wrapped together (as is standard for ISO 20022 messages exchanged with a Business Application Header):</p>
+  <ul>
+    <li><code>&lt;AppHdr&gt;</code> &mdash; a Business Application Header (<code>head.001.001.02</code>)</li>
+    <li><code>&lt;Document&gt;</code> &mdash; the <code>pain.001.001.09</code> Customer Credit Transfer Initiation</li>
+  </ul>
+  <p>The entire document must be <b>XML-signed</b>, and the signature must be verifiable against a document-signing certificate that was issued to your client application during enrollment. Unsigned or incorrectly signed requests are rejected before the payment content is even parsed.</p>
+
+  <h2>Response</h2>
+  <p>On success, the API returns a <code>pain.002</code> (Customer Payment Status Report) as XML in the response body, describing the transfer's initial status.</p>
+
+  <h2>Error handling</h2>
+  <table>
+    <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>401 Unauthorized</code></td><td>XML signature is missing or does not verify against your on-file signing certificate(s).</td></tr>
+      <tr><td><code>400 Bad Request</code></td><td>Document doesn't contain a parseable <code>AppHdr</code> and/or <code>Document</code> element in the expected namespaces.</td></tr>
+      <tr><td><code>500 Internal Server Error</code></td><td>Unexpected server-side failure. Response body is a small <code>&lt;Error&gt;&lt;Message&gt;...&lt;/Message&gt;&lt;/Error&gt;</code> XML document, not a stack trace.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <b>Note:</b>
+    <span>Full field-level schema for <code>pain.001.001.09</code> is standard ISO 20022 and not repeated here; see the <a href="../explorer/index.html">API Explorer</a> for how this operation is described in the API's own spec.</span>
+  </div>
+
+  <div class="callout gap">
+    <b>Gap:</b>
+    <span>This guide only covers the RTGS credit-transfer endpoint. If other payment rails or message types (e.g. non-RTGS transfers) are planned, confirm availability and endpoint paths with the bank &mdash; they weren't present in the reviewed API surface.</span>
+  </div>
+</div>
+
+<footer class="site-footer">BankConnect API &middot; Client Integration Guide</footer>
+<script src="../assets/nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Authentication &middot; BankConnect Developer Guide</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body data-active="Authentication">
+<nav class="topnav" id="topnav"></nav>
+
+<div class="page content">
+  <h1>Authentication</h1>
+  <p class="lede">BankConnect authenticates client applications with mutual TLS (mTLS) client certificates &mdash; there is no API key or OAuth flow for the business endpoints.</p>
+
+  <h2>How it works</h2>
+  <p>Every business request (sending a payment, polling for messages) must present a client certificate that was issued to you during <a href="enrollment.html">enrollment</a>. The certificate's Subject Alternative Name contains two URNs the API reads to identify your application:</p>
+  <ul>
+    <li><code>urn:bankconnect:environment:&lt;environment&gt;</code> &mdash; must match the API's configured environment (e.g. <code>Development</code>, <code>Production</code>)</li>
+    <li><code>urn:bankconnect:id:&lt;clientApplicationId&gt;</code> &mdash; your client application's identifier</li>
+  </ul>
+  <p>On each request the API looks up a matching, non-revoked client-application record by certificate thumbprint and serial number. If nothing matches, the request is rejected before it reaches any controller.</p>
+
+  <h2>Two certificates, two purposes</h2>
+  <table>
+    <thead><tr><th>Certificate</th><th>Used for</th></tr></thead>
+    <tbody>
+      <tr><td><b>mTLS client certificate</b></td><td>Presented on the TLS connection itself, for every request.</td></tr>
+      <tr><td><b>Document-signing certificate</b></td><td>Used to XML-sign payment documents (see <a href="payments.html">Sending Payments</a>). Verified against the certificates on file for your client application &mdash; it is not the same key pair as the mTLS certificate.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Connecting through a proxy</h2>
+  <p>If your integration environment sits directly against the API's IIS/Kestrel binding, the mTLS handshake happens at the TLS layer as usual. If a firewall, load balancer, or reverse proxy terminates TLS in front of the API, ask the bank which <code>HostingType</code> mode is configured (<code>firewall</code>, <code>loadbalancer</code>, <code>nginx</code>, or <code>nginx_liberty</code>) &mdash; in that case the proxy forwards your client certificate to the API via a header instead of a raw TLS handshake, and your side of the integration is unaffected either way: you still present the mTLS client certificate on your outbound connection.</p>
+
+  <h2>Enrollment token (one-time, setup only)</h2>
+  <p>Before you have a working mTLS certificate, the one-time certificate signing request upload (<a href="enrollment.html"><code>POST /csr</code></a>) is authorized differently: with a short-lived, bank-issued <b>enrollment bearer token</b> sent as <code>Authorization: Bearer &lt;token&gt;</code>. This token is only valid for that single enrollment step &mdash; it does not authenticate any other endpoint.</p>
+
+  <div class="callout gap">
+    <b>Gap:</b>
+    <span>Certificate rotation/renewal process, and revocation behavior on the client side, aren't defined in the endpoints reviewed for this guide. Confirm the renewal procedure with the bank integration team before your certificate's one-year validity period ends.</span>
+  </div>
+</div>
+
+<footer class="site-footer">BankConnect API &middot; Client Integration Guide</footer>
+<script src="../assets/nav.js"></script>
+</body>
+</html>
