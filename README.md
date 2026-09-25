@@ -1,2 +1,2 @@
 # BankConnect
-BankConnect Client guide
+github pages: https://altasoft.github.io/BankConnect/
